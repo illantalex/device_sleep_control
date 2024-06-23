@@ -4,6 +4,7 @@
 
 #define SDA_PIN 4
 #define SCL_PIN 14
+#define POWER_CTL_PIN 12
 
 #define EEPROM_SIZE 8
 #define EEPROM_ADDR 0
@@ -12,6 +13,7 @@
 
 uint64_t deepSleepTime = 30LL * 60LL * 1000000LL;
 uint64_t deepSleepTimeBytes = 0;
+bool receivedSleep = false;
 
 void requestCallback() {
     // Add your code to handle the request here
@@ -25,28 +27,41 @@ void receiveCallback(int byteCount) {
 
     while (Wire.available()) {
         // Write 8 bytes from I2C as new deepSleepTime
-        if (byteCount == 8) {
-            // Check if the new deepSleepTime differs from the old one
-            deepSleepTimeBytes = 0;
-            for (int i = 7; i >= 0; i--) {
-                deepSleepTimeBytes |= ((uint64_t)Wire.read() << (i * 8));
-            }
+        int command = Wire.read();
+        switch (command) {
+        case 0x01: {
+            receivedSleep = true;
+            break;
+        }
+        case 0x02: {
+                if (byteCount == 9) {
+                    // Check if the new deepSleepTime differs from the old one
+                    deepSleepTimeBytes = 0;
+                    for (int i = 7; i >= 0; i--) {
+                        deepSleepTimeBytes |= ((uint64_t)Wire.read() << (i * 8));
+                    }
 #ifdef DEBUG
-            Serial.println(deepSleepTimeBytes, HEX);
+                    Serial.println(deepSleepTimeBytes, HEX);
 #endif
-            // Write new deepSleepTime to EEPROM if it differs from the old one
-            if (deepSleepTimeBytes != deepSleepTime) {
-                EEPROM.put(EEPROM_ADDR, deepSleepTimeBytes);
-                EEPROM.commit();
-                EEPROM.get(EEPROM_ADDR, deepSleepTime);
+                    // Write new deepSleepTime to EEPROM if it differs from the old one
+                    if (deepSleepTimeBytes != deepSleepTime) {
+                        EEPROM.put(EEPROM_ADDR, deepSleepTimeBytes);
+                        EEPROM.commit();
+                        EEPROM.get(EEPROM_ADDR, deepSleepTime);
+                    }
+                }
+                break;
             }
+        default:
+            break;
         }
     }
 }
 
 void setup() {
     // Add your setup code here
-
+    pinMode(POWER_CTL_PIN, OUTPUT);
+    digitalWrite(POWER_CTL_PIN, HIGH);
     EEPROM.begin(EEPROM_SIZE);
     EEPROM.get(EEPROM_ADDR, deepSleepTime);
 
@@ -61,8 +76,16 @@ void setup() {
     Wire.onRequest(requestCallback);
     Wire.onReceive(receiveCallback);
 
+    // Go to sleep if receivedSleep is true or when 10 minutes have passed
+    while (!receivedSleep && millis() < 600000){
+        delay(100);
+    }
+    delay(10000); // wait for the raspberry pi to be totally power off
+#ifdef DEBUG
+    Serial.println("Going to sleep");
+#endif
+    digitalWrite(POWER_CTL_PIN, LOW);
     // sleep for 30 minutes or deepSleepTime
-    delay(10000);
     if (deepSleepTime > 0) {
         ESP.deepSleep(deepSleepTime);
     }
