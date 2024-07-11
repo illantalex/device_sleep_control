@@ -14,6 +14,7 @@
 
 uint64_t deepSleepTime = 30LL * 60LL * 1000000LL;
 uint64_t deepSleepTimeBytes = 0;
+const uint64_t maxDeepSleep = 3ULL * 3600ULL * 1000000ULL;
 bool receivedSleep = false;
 
 void requestCallback() {
@@ -61,6 +62,7 @@ void receiveCallback(int byteCount) {
 
 void setup() {
     // Add your setup code here
+    pinMode(16, WAKEUP_PULLUP);
     pinMode(RUN_PIN, OUTPUT);
     digitalWrite(RUN_PIN, LOW);
     pinMode(POWER_CTL_PIN, OUTPUT);
@@ -80,7 +82,7 @@ void setup() {
     Wire.onReceive(receiveCallback);
 
     // Go to sleep if receivedSleep is true or when 10 minutes have passed
-    while (!receivedSleep && millis() < 600){
+    while (!receivedSleep && millis() < 600000){
         delay(100);
     }
     delay(20000); // wait for the raspberry pi to be totally power off
@@ -90,10 +92,10 @@ void setup() {
 #endif
     digitalWrite(POWER_CTL_PIN, LOW);
     // sleep for 30 minutes or deepSleepTime
-    if (deepSleepTime > 0 && deepSleepTime < ESP.deepSleepMax()) {
-        ESP.deepSleep(deepSleepTime, RF_DISABLED);
+    if (deepSleepTime > 0 && deepSleepTime < maxDeepSleep) {
+        ESP.deepSleep(deepSleepTime);
     }
-    ESP.deepSleep(ESP.deepSleepMax(), RF_DISABLED);
+    ESP.deepSleep(maxDeepSleep);
 }
 
 void loop() {
