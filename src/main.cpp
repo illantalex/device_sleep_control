@@ -2,9 +2,10 @@
 #include <Wire.h>
 #include <EEPROM.h>
 
-#define SDA_PIN 4
-#define SCL_PIN 14
-#define POWER_CTL_PIN 12
+#define SDA_PIN 14
+#define SCL_PIN 12
+#define POWER_CTL_PIN 4
+#define RUN_PIN 2
 
 #define EEPROM_SIZE 8
 #define EEPROM_ADDR 0
@@ -60,6 +61,8 @@ void receiveCallback(int byteCount) {
 
 void setup() {
     // Add your setup code here
+    pinMode(RUN_PIN, OUTPUT);
+    digitalWrite(RUN_PIN, LOW);
     pinMode(POWER_CTL_PIN, OUTPUT);
     digitalWrite(POWER_CTL_PIN, HIGH);
     EEPROM.begin(EEPROM_SIZE);
@@ -77,19 +80,20 @@ void setup() {
     Wire.onReceive(receiveCallback);
 
     // Go to sleep if receivedSleep is true or when 10 minutes have passed
-    while (!receivedSleep && millis() < 600000){
+    while (!receivedSleep && millis() < 600){
         delay(100);
     }
-    delay(10000); // wait for the raspberry pi to be totally power off
+    delay(20000); // wait for the raspberry pi to be totally power off
 #ifdef DEBUG
     Serial.println("Going to sleep");
+    Serial.println(deepSleepTime, HEX);
 #endif
     digitalWrite(POWER_CTL_PIN, LOW);
     // sleep for 30 minutes or deepSleepTime
-    if (deepSleepTime > 0) {
-        ESP.deepSleep(deepSleepTime);
+    if (deepSleepTime > 0 && deepSleepTime < ESP.deepSleepMax()) {
+        ESP.deepSleep(deepSleepTime, RF_DISABLED);
     }
-    ESP.deepSleep(30LL * 60LL * 1000000LL);
+    ESP.deepSleep(ESP.deepSleepMax(), RF_DISABLED);
 }
 
 void loop() {
