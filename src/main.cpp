@@ -7,13 +7,11 @@
 #define POWER_CTL_PIN 4
 #define RUN_PIN 2
 
-#define EEPROM_SIZE 8
-#define EEPROM_ADDR 0
-
 // #define DEBUG
 
-uint64_t deepSleepTime = 30LL * 60LL * 1000000LL;
+uint64_t deepSleepTime = 0;
 uint64_t deepSleepTimeBytes = 0;
+uint32_t awakeMilliseconds = 600000;
 const uint64_t maxDeepSleep = 3ULL * 3600ULL * 1000000ULL;
 bool receivedSleep = false;
 
@@ -31,11 +29,11 @@ void receiveCallback(int byteCount) {
         // Write 8 bytes from I2C as new deepSleepTime
         int command = Wire.read();
         switch (command) {
-        case 0x01: {
-            receivedSleep = true;
-            break;
-        }
-        case 0x02: {
+            case 0x01: {
+                receivedSleep = true;
+                break;
+            }
+            case 0x02: {
                 if (byteCount == 9) {
                     // Check if the new deepSleepTime differs from the old one
                     deepSleepTimeBytes = 0;
@@ -45,30 +43,27 @@ void receiveCallback(int byteCount) {
 #ifdef DEBUG
                     Serial.println(deepSleepTimeBytes, HEX);
 #endif
-                    // Write new deepSleepTime to EEPROM if it differs from the old one
-                    if (deepSleepTimeBytes != deepSleepTime) {
-                        EEPROM.put(EEPROM_ADDR, deepSleepTimeBytes);
-                        EEPROM.commit();
-                        EEPROM.get(EEPROM_ADDR, deepSleepTime);
-                    }
                 }
                 break;
             }
-        default:
-            break;
-        }
+            case 0x03: {
+                // Add more awake time
+                awakeMilliseconds += 600000;
+                break;
+            }
+            default:
+                break;
+            }
     }
 }
 
 void setup() {
     // Add your setup code here
     pinMode(16, WAKEUP_PULLUP);
-    pinMode(RUN_PIN, OUTPUT);
-    digitalWrite(RUN_PIN, LOW);
+    // pinMode(RUN_PIN, OUTPUT);
+    // digitalWrite(RUN_PIN, LOW);
     pinMode(POWER_CTL_PIN, OUTPUT);
     digitalWrite(POWER_CTL_PIN, HIGH);
-    EEPROM.begin(EEPROM_SIZE);
-    EEPROM.get(EEPROM_ADDR, deepSleepTime);
 
 #ifdef DEBUG
     Serial.begin(115200);
@@ -82,7 +77,7 @@ void setup() {
     Wire.onReceive(receiveCallback);
 
     // Go to sleep if receivedSleep is true or when 10 minutes have passed
-    while (!receivedSleep && millis() < 600000){
+    while (!receivedSleep && millis() < awakeMilliseconds){
         delay(100);
     }
     delay(20000); // wait for the raspberry pi to be totally power off
