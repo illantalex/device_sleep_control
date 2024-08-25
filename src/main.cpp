@@ -40,6 +40,7 @@ void receiveCallback(int byteCount) {
                     for (int i = 7; i >= 0; i--) {
                         deepSleepTimeBytes |= ((uint64_t)Wire.read() << (i * 8));
                     }
+                    deepSleepTime = deepSleepTimeBytes;
 #ifdef DEBUG
                     Serial.println(deepSleepTimeBytes, HEX);
 #endif
